@@ -1,42 +1,33 @@
+# Generated output
+output/
+
+# Sample reports
+samples/
+
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.Python
-venv/
-env/
-.venv/
+.pytest_cache/
+.mypy_cache/
 
-# Environment / secrets
+# Virtual env
+venv/
+.venv/
+env/
+
+# Secrets
 .env
 .env.*
-*.key
-*.pem
-credentials.json
-token.json
-client_secret*.json
 credentials/
+credentials.json
+client_secret*.json
+token.json
+*.pem
+*.key
 
 # VS Code
 .vscode/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Build / cache
-dist/
-build/
-*.egg-info/
-.cache/
-.pytest_cache/
-
-# Excel/temp files
-~$*.xlsx
-~$*.xls
-*.tmp

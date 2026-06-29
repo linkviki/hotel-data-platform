@@ -1,11 +1,9 @@
-import json
 from pathlib import Path
 from datetime import datetime
 
 from services.pdf_service import pdf_page_to_png
 from services.vision_service import extract_json_from_image
 from validators.revenue_validator import validate_revenue_report
-from writers.google_sheets import append_daily_hotel_metrics, append_import_log
 
 PDF_PATH = Path("samples/REVENUE REPORT - JUNE 29 2026.pdf")
 PROMPT_PATH = Path("prompts/revenue_report_prompt.txt")
@@ -37,29 +35,3 @@ def extract_revenue_report(pdf_path: Path) -> dict:
         data["notes"] = ""
 
     return data
-
-
-if __name__ == "__main__":
-    result = extract_revenue_report(PDF_PATH)
-
-    print(json.dumps(result, indent=4))
-
-    if result["status"] == "VALIDATED":
-        appended = append_daily_hotel_metrics(result)
-
-        if appended:
-            append_import_log(result, action="APPENDED")
-            print("Appended row to Google Sheet.")
-        else:
-            append_import_log(result, action="DUPLICATE_SKIPPED")
-            print("Skipped Google Sheet append.")
-    else:
-        append_import_log(result, action="VALIDATION_FAILED")
-        print("Validation failed. Logged to Import_Log.")
-
-    OUTPUT_JSON_PATH.parent.mkdir(exist_ok=True)
-
-    with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=4)
-
-    print(f"\nSaved JSON to: {OUTPUT_JSON_PATH}")

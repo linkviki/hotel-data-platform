@@ -1,0 +1,40 @@
+Extract hotel revenue report data from this image.
+
+Return ONLY valid JSON using this exact schema:
+
+{
+  "business_date": "YYYY-MM-DD",
+  "hotel_name": "",
+  "report_type": "Revenue Report",
+  "room_revenue": null,
+  "gross_revenue": null,
+  "fb_revenue": null,
+  "beverage_revenue": null,
+  "other_income": null,
+  "rooms_sold": null,
+  "rooms_occupied": null,
+  "rooms_available": null,
+  "rooms_vacant": null,
+  "occupancy_pct": null,
+  "adr": null,
+  "revpar": null,
+  "total_guests": null,
+  "cancelled_reservations": null,
+  "no_shows": null,
+  "walk_ins": null,
+  "ptd_room_revenue": null,
+  "ytd_room_revenue": null
+}
+
+Rules:
+- Extract TODAY'S ACTUAL column for daily values.
+- For room_revenue use TOTAL ROOM SALES.
+- For gross_revenue use GROSS HOTEL SALES.
+- For fb_revenue use TOTAL F. & B. SALES.
+- For beverage_revenue use BEVERAGE SALES.
+- For rooms_sold use # ROOMS SOLD.
+- For occupancy_pct use OCCUPANCY PCT.
+- For adr use AVG RATE PER ROOM.
+- For revpar use REV PAR.
+- Use numbers only. No dollar signs or commas.
+- If a value is missing, use null.

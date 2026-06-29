@@ -1,0 +1,61 @@
+                                                        Residence Inn Laval
+                                                          Revenue Report
+ 28Jun26 Run on 29Jun26 04:00 AM                  (DAY 28 OF PERIOD 06) - 30 DAY                                      Page  1
+-----------------------------------------------------------------------------------------------------------------------------------
+
+                                    TODAY'S         TODAY'S        PTD'S            PTD'S           YTD'S           YTD'S
+                                     ACTUAL          BUDGET       ACTUAL           BUDGET          ACTUAL          BUDGET
+
+      ROOMS-TRANSIENT             13,594.09             .00    385,185.92             .00     2345,645.18             .00
+      ROOMS-GROUP                       .00             .00           .00             .00      370,840.50             .00
+      ROOMS-LEASE / CONTRACT            .00             .00           .00             .00             .00             .00
+      ROOMS-MISCELLANEOUS               .00             .00      2,400.00             .00        6,750.00             .00
+      GNS BILLED                        .00             .00        498.00             .00        1,535.00             .00
+      LESS REBATES                      .00             .00        283.00-            .00        4,576.19-            .00
+      TOTAL ROOM SALES            13,594.09             .00    387,800.92             .00     2720,194.49             .00
+
+      FOOD SALES                      20.00             .00        743.15             .00        2,953.84             .00
+      BEVERAGE SALES                  93.50             .00      5,931.14             .00       32,770.16             .00
+      FUNCTION RM. SALES                .00             .00           .00             .00        1,500.00             .00
+      TOTAL F. & B. SALES            113.50             .00      6,674.29             .00       37,224.00             .00
+
+      TELEPHONE SALES
+         LOCAL                          .00             .00           .00             .00             .00             .00
+         LONG DISTANCE                  .00             .00           .00             .00             .00             .00
+         FAX REVENUE                    .00             .00           .00             .00             .00             .00
+         LESS REBATES                   .00             .00           .00             .00             .00             .00
+      TOTAL TELEPHONE                   .00             .00           .00             .00             .00             .00
+
+      RETAIL SALES                      .00             .00           .00             .00             .00             .00
+      OTHER INCOME                     8.00             .00        742.55             .00        9,982.00             .00
+      TOTAL MISC. SALES                8.00             .00        742.55             .00        9,982.00             .00
+
+      GROSS HOTEL SALES           13,715.59             .00    395,217.76             .00     2767,400.49             .00
+
+    # ROOMS OCCUPIED                    65               0         1,749               0          12,103               0
+    # ROOMS VACANT                      46               0         1,355               0           7,663               0
+    # AVAILABLE FOR SALE               111               0         3,108               0          19,869               0
+    # OUT OF ORDER                       0               0             4               0             103               0
+    # TOTAL ROOMS                      111               0         3,108               0          19,869               0
+    # COMPLIMENTARY ROOMS                0               0             2               0              46               0
+    # ROOMS SOLD                        65               0         1,747               0          12,057               0
+    # MANUAL ROOM NIGHTS POSTED          0               0             8               0              14               0
+    # ROOM NIGHTS SOLD                  65               0         1,755               0          12,071               0
+    # TOTAL GUESTS                     113               0         2,375               0          16,070               0
+    # MANUAL POSTINGS                    0               0            22               0              82               0
+      AVG LENGTH OF STAY              12.32
+
+      AVG RATE PER ROOM              209.14             .00        221.98             .00          225.61             .00
+      OCCUPANCY PCT                   58.56             .00         56.21             .00           60.68             .00
+      REV PAR                        122.47             .00        124.77             .00          136.90             .00
+    # CANCELLED RESERVATIONS             3               0            60               0             584               0
+    # GUARANTEED NO-SHOWS                0               0             6               0              13               0
+    # WALK-INS                           0               0             9               0              27               0
+    # EARLY CHECK OUTS                   0               0            12               0             160               0
+
+
+                         MARRIOTT CONFIDENTIAL AND PROPRIETARY INFORMATION The contents of this material
+                         are confidential and proprietary to Marriott International, Inc. and may not be
+                         reproduced, disclosed, distributed or used without the express permission of an
+                         authorized representative of Marriott. Any other use is expressly prohibited.
+

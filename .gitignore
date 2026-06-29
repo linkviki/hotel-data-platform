@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# Environment / secrets
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+token.json
+client_secret*.json
+credentials/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build / cache
+dist/
+build/
+*.egg-info/
+.cache/
+.pytest_cache/
+
+# Excel/temp files
+~$*.xlsx
+~$*.xls
+*.tmp

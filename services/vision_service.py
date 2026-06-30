@@ -16,12 +16,25 @@ def encode_image(image_path: Path) -> str:
 
 
 def clean_json_response(raw: str) -> dict:
+    import re
+
     raw = raw.strip()
+
+    #print("\n--- RAW VISION RESPONSE START ---")
+    #print(raw[:3000])
+    #print("--- RAW VISION RESPONSE END ---\n")
 
     if raw.startswith("```"):
         raw = raw.replace("```json", "").replace("```", "").strip()
 
-    return json.loads(raw)
+    # Extract only the JSON object from surrounding text
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise ValueError("No JSON object found in vision response")
+
+    json_text = match.group(0)
+
+    return json.loads(json_text)
 
 
 def extract_json_from_image(image_path: Path, prompt: str) -> dict:

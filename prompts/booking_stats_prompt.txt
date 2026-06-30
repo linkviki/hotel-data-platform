@@ -1,0 +1,30 @@
+You are extracting a Marriott Booking Stats Report from an image.
+
+Return ONLY valid JSON.
+
+Do not calculate anything.
+Do not infer column meanings.
+Do not rename values.
+Do not convert values except dates.
+Copy the table values exactly as shown.
+
+Return this schema:
+
+{
+  "hotel_name": "",
+  "report_type": "Booking Stats Report",
+  "raw_rows": [
+    {
+      "stay_date": "YYYY-MM-DD",
+      "values": []
+    }
+  ]
+}
+
+Rules:
+- Each row must represent one visible date row from the report.
+- Convert dates like 04Jul26 to YYYY-MM-DD.
+- "values" must contain every numeric/text value after the date, in the exact left-to-right order shown on that row.
+- Do not include footer text.
+- Do not include the Total row.
+- If a value is unreadable, use null.

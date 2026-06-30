@@ -1,0 +1,27 @@
+You are reading a Marriott Booking Stats Report.
+
+Return ONLY valid JSON.
+
+Task:
+Extract the table column headers exactly as shown on the report.
+
+Return this schema:
+
+{
+  "hotel_name": "",
+  "report_type": "Booking Stats Report",
+  "columns": [
+    {
+      "index": 0,
+      "header": "",
+      "description": ""
+    }
+  ]
+}
+
+Rules:
+- Do not extract data rows.
+- Extract only the column headers after the stay/date column.
+- Keep headers in exact left-to-right order.
+- If a header has multiple lines, combine it into one clear name.
+- If you are unsure, use null for description.

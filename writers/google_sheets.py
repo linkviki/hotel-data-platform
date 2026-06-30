@@ -85,3 +85,47 @@ def append_import_log(data: dict, action: str):
 
     worksheet.append_row(row, value_input_option="USER_ENTERED")
     return True
+
+def append_booking_forecast_rows(rows: list[dict]):
+    sheet = get_google_sheet()
+    worksheet = sheet.worksheet("Booking_Forecast")
+
+    columns = worksheet.row_values(1)
+    records = worksheet.get_all_records()
+
+    existing_keys = {
+        (
+            str(record.get("hotel_name", "")).strip(),
+            str(record.get("stay_date", "")).strip(),
+            str(record.get("source_file_name", "")).strip(),
+        )
+        for record in records
+    }
+
+    appended_count = 0
+    skipped_count = 0
+    rows_to_append = []
+
+    for data in rows:
+        key = (
+            str(data.get("hotel_name", "")).strip(),
+            str(data.get("stay_date", "")).strip(),
+            str(data.get("source_file_name", "")).strip(),
+        )
+
+        if key in existing_keys:
+            skipped_count += 1
+            continue
+
+        row = [data.get(column, "") for column in columns]
+        rows_to_append.append(row)
+        existing_keys.add(key)
+        appended_count += 1
+
+    if rows_to_append:
+        worksheet.append_rows(rows_to_append, value_input_option="USER_ENTERED")
+
+    return {
+        "appended": appended_count,
+        "skipped": skipped_count,
+    }

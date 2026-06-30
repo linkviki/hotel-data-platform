@@ -3,6 +3,7 @@ from datetime import datetime
 
 from services.pdf_service import pdf_page_to_png
 from services.vision_service import extract_json_from_image
+from models.status import ImportStatus
 from validators.revenue_validator import validate_revenue_report
 
 PDF_PATH = Path("samples/REVENUE REPORT - JUNE 29 2026.pdf")
@@ -28,10 +29,10 @@ def extract_revenue_report(pdf_path: Path) -> dict:
     errors = validate_revenue_report(data)
 
     if errors:
-        data["status"] = "VALIDATION_FAILED"
+        data["status"] = ImportStatus.VALIDATION_FAILED
         data["notes"] = "; ".join(errors)
     else:
-        data["status"] = "VALIDATED"
+        data["status"] = ImportStatus.VALIDATED
         data["notes"] = ""
 
     return data

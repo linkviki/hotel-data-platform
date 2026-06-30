@@ -4,8 +4,7 @@ from datetime import datetime
 
 from services.pdf_service import pdf_page_to_png
 from services.vision_service import extract_json_from_image
-from validators.booking_validator import validate_booking_stats
-
+from models.status import ImportStatus
 
 PDF_PATH = Path("samples/BOOKING STATS REPORT - JUNE 29 2026.pdf")
 PROMPT_PATH = Path("prompts/booking_stats_prompt.txt")
@@ -45,28 +44,20 @@ def extract_booking_stats(pdf_path: Path) -> dict:
 
     result_header["source_file_name"] = pdf_path.name
     result_header["import_time"] = datetime.now().isoformat(timespec="seconds")
-
-    '''errors = validate_booking_stats(result_header)
-
-    if errors:
-        result_header["status"] = "VALIDATION_FAILED"
-        result_header["notes"] = "; ".join(errors)
-    else:
-        result_header["status"] = "VALIDATED"
-        result_header["notes"] = ""'''
-    result_header["status"] = "RAW_EXTRACTED"
-    result_header["notes"] = "Raw table extraction only. Mapping not applied yet."
     return result_header
 
 
 if __name__ == "__main__":
     result = extract_booking_stats(PDF_PATH)
+    result_for_output = dict(result)
+    result_for_output["status"] = ImportStatus.RAW_EXTRACTED
+    result_for_output["notes"] = "Raw table extraction only. Mapping not applied yet."
 
-    print(json.dumps(result, indent=4))
+    print(json.dumps(result_for_output, indent=4))
 
     OUTPUT_JSON_PATH.parent.mkdir(exist_ok=True)
 
     with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=4)
+        json.dump(result_for_output, f, indent=4)
 
     print(f"\nSaved JSON to: {OUTPUT_JSON_PATH}")

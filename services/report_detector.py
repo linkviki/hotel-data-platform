@@ -2,6 +2,7 @@
 
 import json
 import sys
+import re
 from pathlib import Path
 
 REPORT_RULES_PATH = Path(__file__).resolve().parents[1] / "config" / "report_rules.json"
@@ -94,7 +95,8 @@ def load_report_rules() -> list[dict]:
 
 
 def detect_report_type(file_path: Path) -> str:
-    file_name = file_path.name.lower()
+    file_name = re.sub(r"[_-]+", " ", file_path.name.lower())
+    file_name = re.sub(r"\s+", " ", file_name).strip()
 
     for rule in load_report_rules():
         for keyword in rule["keywords"]:

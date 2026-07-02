@@ -1,0 +1,12 @@
+﻿{
+  "rules": [
+    {
+      "report_type": "REVENUE_REPORT",
+      "keywords": ["revenue report"]
+    },
+    {
+      "report_type": "BOOKING_STATS_REPORT",
+      "keywords": ["booking stats"]
+    }
+  ]
+}

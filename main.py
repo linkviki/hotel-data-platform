@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 from extractors.revenue_report import extract_revenue_report
@@ -13,6 +14,10 @@ from validators.booking_validator import validate_mapped_booking_rows
 PDF_PATH = Path("samples/REVENUE REPORT - JUNE 29 2026.pdf")
 BOOKING_PDF_PATH = Path("samples/BOOKING STATS REPORT - JUNE 29 2026.pdf")
 OUTPUT_JSON_PATH = Path("output/revenue_report_extracted.json")
+DEFAULT_SAMPLE_FILES = [
+    PDF_PATH,
+    BOOKING_PDF_PATH,
+]
 
 
 def process_revenue_report(pdf_path: Path):
@@ -123,11 +128,21 @@ def process_file(pdf_path: Path):
         print(f"Unknown report type: {pdf_path.name}")
 
 
-if __name__ == "__main__":
-    sample_files = [
-        Path("samples/REVENUE REPORT - JUNE 29 2026.pdf"),
-        Path("samples/BOOKING STATS REPORT - JUNE 29 2026.pdf"),
-    ]
+def resolve_input_files(argv: list[str]) -> list[Path]:
+    if not argv:
+        return DEFAULT_SAMPLE_FILES
 
-    for file_path in sample_files:
+    input_files = [Path(argument) for argument in argv]
+    missing_files = [path for path in input_files if not path.exists()]
+
+    if missing_files:
+        for path in missing_files:
+            print(f"File not found: {path}")
+        raise SystemExit(1)
+
+    return input_files
+
+
+if __name__ == "__main__":
+    for file_path in resolve_input_files(sys.argv[1:]):
         process_file(file_path)

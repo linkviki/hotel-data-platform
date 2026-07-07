@@ -1,0 +1,36 @@
+You are extracting a hotel annual budget report from an image.
+
+Return ONLY valid JSON using this exact schema:
+
+{
+  "hotel_name": "",
+  "year": null,
+  "report_type": "Budget Report",
+  "budget_rows": [
+    {
+      "month_number": null,
+      "month_name": "",
+      "available_rooms": null,
+      "rooms_sold": null,
+      "occupancy_pct": null,
+      "adr": null,
+      "revpar": null,
+      "room_revenue": null,
+      "fb_revenue": null,
+      "misc_revenue": null,
+      "total_revenue": null
+    }
+  ]
+}
+
+Rules:
+- Extract only the monthly budget table visible in the image.
+- Return one row per month that is visible.
+- Months run from January to December.
+- If a month is not visible, do not fabricate it.
+- Use month_number values from 1 to 12.
+- Use numbers only. No dollar signs or commas.
+- Keep occupancy_pct as the percentage value shown.
+- If a value is missing, use null.
+- Do not calculate values.
+- Ignore annual summary totals, capex tables, variance columns, notes, and narrative text.

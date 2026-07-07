@@ -230,3 +230,59 @@ Dashboard-ready monthly grain for comparing actual, forecast, budget, and last y
 - GOP, EBITDA, payroll, and net income should be Phase 2 after monthly 2026 P&Ls arrive.
 - The exact transformation owner for dashboard-ready tables is still unspecified.
 - The dashboard should confirm whether forecast snapshots are daily, weekly, or ad hoc once `snapshot_date` is added.
+
+## 12. Hotel Normalization Registry
+
+The repository now includes `config/hotels.json` as the canonical hotel registry.
+
+### 12.1 Purpose
+
+`config/hotels.json` stores the standardized hotel name as the top-level key and keeps the property metadata alongside it.
+
+Example shape:
+
+```json
+{
+  "Residence Inn Laval": {
+    "hotel_id": 1,
+    "brand": "Marriott",
+    "city": "Laval",
+    "province": "QC",
+    "rooms": 111
+  }
+}
+```
+
+### 12.2 Current Consumers
+
+| Module | Uses `config/hotels.json`? | Notes |
+|---|---|---|
+| `extractors/` | No | Extractors currently return the hotel name from the source report. |
+| `validators/` | No | Validators check structure and ranges only. |
+| `writers/` | No | Writers append rows and perform duplicate detection on existing sheet keys. |
+| `main.py` | No | `main.py` orchestrates routing but does not normalize hotel names yet. |
+
+### 12.3 Standardization Rule
+
+- Canonical hotel names are the exact JSON keys in `config/hotels.json`.
+- Any alias, abbreviation, or source-specific variation should be normalized to the canonical key before a row is treated as final.
+- Downstream grouping, dashboarding, and duplicate logic should use the canonical name, not a guessed variation.
+
+### 12.4 Add a New Hotel
+
+1. Add a new top-level key to `config/hotels.json`.
+2. Use the exact canonical display name as the key.
+3. Add the property metadata fields needed by the platform.
+4. Update any documentation, mappings, or tests that depend on the hotel registry.
+
+### 12.5 Unknown Hotel Behavior
+
+- If a source hotel name is not present in the registry, keep the raw source value rather than inventing a match.
+- Mark the record as needing review if normalization is implemented in a future runtime path.
+- Do not merge an unknown hotel into an existing property just to force a match.
+
+### 12.6 Risk If Missing
+
+- Missing registry coverage can split one property across multiple names.
+- That fragmentation can break duplicate detection, dashboard grouping, and month-over-month comparisons.
+- The safest fallback is to preserve the raw name and surface the mismatch for manual follow-up.

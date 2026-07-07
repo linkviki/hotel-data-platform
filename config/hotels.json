@@ -1,0 +1,16 @@
+{
+  "Residence Inn Laval": {
+    "hotel_id": 1,
+    "brand": "Marriott",
+    "city": "Laval",
+    "province": "QC",
+    "rooms": 111
+  },
+  "Holiday Inn Express Halifax": {
+    "hotel_id": 2,
+    "brand": "IHG",
+    "city": "Halifax",
+    "province": "NS",
+    "rooms": 98
+  }
+}

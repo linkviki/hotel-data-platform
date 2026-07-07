@@ -28,6 +28,7 @@ Current report coverage:
 | Folder | Responsibility | Notes |
 |---|---|---|
 | `config/` | Configuration placeholders | `config/settings.py` is currently empty. |
+| `config/hotels.json` | Canonical hotel registry | Stores standardized hotel names and property metadata. Currently not consumed by a runtime module. |
 | `credentials/` | Local Google OAuth files | Contains OAuth client/token material used by the Sheets client. |
 | `docs/` | Repository documentation | Human and agent-facing docs live here. |
 | `extractors/` | PDF-to-JSON extraction logic | Contains revenue, booking, and booking header extraction helpers. |
@@ -49,6 +50,18 @@ Current report coverage:
 - Keep status strings centralized in `models/status.py`.
 - Preserve existing sheet names and duplicate-key rules.
 - Do not add business logic to extractors that belongs in validation or mapping.
+- Treat `config/hotels.json` as the canonical hotel registry when implementing hotel-name normalization.
+- Do not guess a hotel mapping if a source name is not present in `config/hotels.json`; preserve the raw name and flag it for review.
+
+## Hotel Normalization Notes
+
+- `config/hotels.json` is the single source of truth for canonical hotel names and their metadata.
+- The current codebase does not yet read this file at runtime; documentation and future implementations should treat it as the contract for normalization work.
+- Canonical names are the top-level JSON keys, for example `Residence Inn Laval` and `Holiday Inn Express Halifax`.
+- Standardization means converting aliases or report variations to the exact canonical key before any grouping, duplicate detection, dashboard transform, or warehouse-style output.
+- Unknown hotels should remain usable as raw source values, but they should not be silently re-labeled or merged into a different hotel.
+- When adding a new hotel, add a new top-level key with the canonical name and property metadata, then update any downstream mappings or tests that depend on the registry.
+- Main risk of a missing registry entry is fractured reporting: the same property can appear under multiple names, which will break grouping, comparisons, and duplicate checks.
 
 ## Current Workflow
 

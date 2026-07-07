@@ -28,7 +28,7 @@ Current report coverage:
 | Folder | Responsibility | Notes |
 |---|---|---|
 | `config/` | Configuration placeholders | `config/settings.py` is currently empty. |
-| `config/hotels.json` | Canonical hotel registry | Stores standardized hotel names and property metadata. Currently not consumed by a runtime module. |
+| `config/hotels.json` | Canonical hotel registry | Stores standardized hotel names and property metadata. Used by the budget importer for hotel-name normalization. |
 | `credentials/` | Local Google OAuth files | Contains OAuth client/token material used by the Sheets client. |
 | `docs/` | Repository documentation | Human and agent-facing docs live here. |
 | `extractors/` | PDF-to-JSON extraction logic | Contains revenue, booking, and booking header extraction helpers. |
@@ -81,6 +81,14 @@ Current report coverage:
 4. `validators/booking_validator.py` validates the mapped rows.
 5. `writers/google_sheets.py` batch appends to `Booking_Forecast`.
 6. `writers/google_sheets.py` appends an `Import_Log` entry.
+
+### Budget Report
+
+1. `extractors/budget_report.py` renders page 2 of the annual budget PDF and sends it to OpenAI Vision.
+2. `extractors/budget_report.py` normalizes the hotel name using `config/hotels.json`.
+3. `validators/budget_validator.py` validates that all 12 months and required budget fields are present.
+4. `writers/google_sheets.py` batch appends validated rows to `Budget_Monthly`.
+5. `writers/google_sheets.py` appends an `Import_Log` entry.
 
 ### Booking Header Analysis
 
@@ -140,7 +148,9 @@ Use the project virtual environment when it is available:
 - `TOKEN_FILE` is refreshed or created locally.
 - `Daily_Hotel_Metrics` duplicate detection uses `business_date + hotel_name + report_type`.
 - `Booking_Forecast` duplicate detection uses `hotel_name + stay_date + source_file_name`.
+- `Budget_Monthly` duplicate detection uses `hotel_name + year + month_number`.
 - `Booking_Forecast` writes use batch `append_rows`.
+- `Budget_Monthly` writes use batch `append_rows`.
 - `Import_Log` always appends a new row.
 
 ## OpenAI Vision Notes

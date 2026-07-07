@@ -1,4 +1,5 @@
 You are extracting a hotel annual budget report from an image.
+The monthly budget table is on page 2 of the PDF.
 
 Return ONLY valid JSON using this exact schema:
 
@@ -25,8 +26,7 @@ Return ONLY valid JSON using this exact schema:
 
 Rules:
 - Extract only the monthly budget table visible in the image.
-- Return one row per month that is visible.
-- Months run from January to December.
+- Return one row per month from January through December.
 - If a month is not visible, do not fabricate it.
 - Use month_number values from 1 to 12.
 - Use numbers only. No dollar signs or commas.

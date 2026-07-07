@@ -257,7 +257,8 @@ Example shape:
 
 | Module | Uses `config/hotels.json`? | Notes |
 |---|---|---|
-| `extractors/` | No | Extractors currently return the hotel name from the source report. |
+| `extractors/booking_stats.py` | No | Booking extraction currently returns the hotel name from the source report. |
+| `extractors/budget_report.py` | Yes | Budget extraction normalizes the source hotel name to the canonical registry key. |
 | `validators/` | No | Validators check structure and ranges only. |
 | `writers/` | No | Writers append rows and perform duplicate detection on existing sheet keys. |
 | `main.py` | No | `main.py` orchestrates routing but does not normalize hotel names yet. |

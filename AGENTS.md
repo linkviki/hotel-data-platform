@@ -10,6 +10,7 @@ Current report coverage:
 |---|---|---|
 | Revenue Report | `extractors/revenue_report.py` -> `validators/revenue_validator.py` -> `writers/google_sheets.py` | `Daily_Hotel_Metrics` and `Import_Log` |
 | Booking Stats Report | `extractors/booking_stats.py` -> `models/booking_mapping.py` -> `validators/booking_validator.py` -> `writers/google_sheets.py` | `Booking_Forecast` and `Import_Log` |
+| Historical Monthly P&L | `extractors/historical_pl.py` -> `validators/historical_validator.py` -> `writers/google_sheets.py` | `Historical_Monthly` and `Import_Log` |
 | Booking Header Analysis | `extractors/booking_header_analyzer.py` | `output/booking_header_analysis.json` |
 
 ## AI Agent Instructions
@@ -28,7 +29,7 @@ Current report coverage:
 | Folder | Responsibility | Notes |
 |---|---|---|
 | `config/` | Configuration placeholders | `config/settings.py` is currently empty. |
-| `config/hotels.json` | Canonical hotel registry | Stores standardized hotel names and property metadata. Used by the budget importer for hotel-name normalization. |
+| `config/hotels.json` | Canonical hotel registry | Stores standardized hotel names and property metadata. Used by the budget and historical importers for hotel-name normalization. |
 | `credentials/` | Local Google OAuth files | Contains OAuth client/token material used by the Sheets client. |
 | `docs/` | Repository documentation | Human and agent-facing docs live here. |
 | `extractors/` | PDF-to-JSON extraction logic | Contains revenue, booking, and booking header extraction helpers. |
@@ -90,6 +91,15 @@ Current report coverage:
 4. `writers/google_sheets.py` batch appends validated rows to `Budget_Monthly`.
 5. `writers/google_sheets.py` appends an `Import_Log` entry.
 
+### Historical Monthly P&L
+
+1. `extractors/historical_pl.py` opens the Excel workbook with `openpyxl`.
+2. `extractors/historical_pl.py` detects the hotel from the filename or workbook text and normalizes it using `config/hotels.json`.
+3. `extractors/historical_pl.py` reads values by row label instead of fixed row numbers.
+4. `validators/historical_validator.py` checks the required monthly fields and the month/year grain.
+5. `writers/google_sheets.py` batch appends validated rows to `Historical_Monthly`.
+6. `writers/google_sheets.py` appends an `Import_Log` entry.
+
 ### Booking Header Analysis
 
 - `extractors/booking_header_analyzer.py` is a standalone helper that extracts booking header metadata to `output/booking_header_analysis.json`.
@@ -149,8 +159,10 @@ Use the project virtual environment when it is available:
 - `Daily_Hotel_Metrics` duplicate detection uses `business_date + hotel_name + report_type`.
 - `Booking_Forecast` duplicate detection uses `hotel_name + stay_date + source_file_name`.
 - `Budget_Monthly` duplicate detection uses `hotel_name + year + month_number`.
+- `Historical_Monthly` duplicate detection uses `hotel_name + year + month_number`.
 - `Booking_Forecast` writes use batch `append_rows`.
 - `Budget_Monthly` writes use batch `append_rows`.
+- `Historical_Monthly` writes use batch `append_rows`.
 - `Import_Log` always appends a new row.
 
 ## OpenAI Vision Notes

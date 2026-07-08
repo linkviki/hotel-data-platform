@@ -38,6 +38,10 @@ def validate_budget_rows(rows: list[dict]) -> list[str]:
         year = row.get("year")
         month_number = row.get("month_number")
         month_name = row.get("month_name")
+        room_revenue = row.get("room_revenue")
+        fb_revenue = row.get("fb_revenue")
+        misc_revenue = row.get("misc_revenue")
+        total_revenue = row.get("total_revenue")
 
         key = (hotel_name, year, month_number)
 
@@ -62,14 +66,32 @@ def validate_budget_rows(rows: list[dict]) -> list[str]:
         if isinstance(month_number, (int, float)) and not (1 <= int(month_number) <= 12):
             errors.append(f"Row {index}: month_number out of range: {month_number}")
 
+        coerced_month_number = None
         if isinstance(month_number, int) and 1 <= month_number <= 12:
-            seen_months.add(month_number)
+            coerced_month_number = month_number
+        elif isinstance(month_number, float) and month_number.is_integer() and 1 <= int(month_number) <= 12:
+            coerced_month_number = int(month_number)
+        elif isinstance(month_number, str) and month_number.strip().isdigit():
+            maybe_month = int(month_number.strip())
+            if 1 <= maybe_month <= 12:
+                coerced_month_number = maybe_month
 
-            expected_month_name = calendar.month_name[month_number]
-            if isinstance(month_name, str) and month_name.strip().title() != expected_month_name:
+        if coerced_month_number is not None:
+            seen_months.add(coerced_month_number)
+
+            expected_month_name = calendar.month_name[coerced_month_number]
+            if not isinstance(month_name, str) or month_name.strip().title() != expected_month_name:
                 errors.append(
-                    f"Row {index}: month_name mismatch for {month_number}: "
+                    f"Row {index}: month_number/month_name mismatch for {coerced_month_number}: "
                     f"expected {expected_month_name}, got {month_name}"
+                )
+
+        if all(isinstance(value, (int, float)) for value in [room_revenue, fb_revenue, misc_revenue, total_revenue]):
+            expected_total = round(float(room_revenue) + float(fb_revenue) + float(misc_revenue), 2)
+            actual_total = round(float(total_revenue), 2)
+            if abs(expected_total - actual_total) > 2:
+                errors.append(
+                    f"Row {index}: total_revenue mismatch: expected approximately {expected_total}, got {actual_total}"
                 )
 
         occupancy_pct = row.get("occupancy_pct")

@@ -29,8 +29,11 @@ Rules:
 - Return one row per month from January through December.
 - If a month is not visible, do not fabricate it.
 - Use month_number values from 1 to 12.
+- Map each value strictly from the row label directly under the matching month header.
+- Do not shift a value left or right if a neighboring month is unclear.
 - Use numbers only. No dollar signs or commas.
 - Keep occupancy_pct as the percentage value shown.
 - If a value is missing, use null.
 - Do not calculate values.
+- Do not infer total_revenue from other months or from annual totals.
 - Ignore annual summary totals, capex tables, variance columns, notes, and narrative text.

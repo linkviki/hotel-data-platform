@@ -1,3 +1,4 @@
+import argparse
 import calendar
 import json
 import re
@@ -9,7 +10,10 @@ from functools import lru_cache
 from pathlib import Path
 from uuid import uuid4
 
+import pdfplumber
+
 from models.status import ImportStatus
+from writers.google_sheets import get_google_sheet
 from services.pdf_service import pdf_page_to_png
 from services.vision_service import extract_json_from_image
 from validators.budget_validator import validate_budget_rows
@@ -22,6 +26,7 @@ HOTELS_PATH = Path("config/hotels.json")
 OUTPUT_JSON_PATH = Path("output/budget_report_extracted.json")
 REPORT_TYPE = "Budget Report"
 BUDGET_PAGE_NUMBER = 1
+SHEET_CLEAR_RANGE = "A2:Z"
 MONTHLY_NUMERIC_FIELDS = [
     "available_rooms",
     "rooms_sold",
@@ -37,6 +42,28 @@ MONTHS_BY_NUMBER = {index: calendar.month_name[index] for index in range(1, 13)}
 MONTH_NUMBERS_BY_NAME = {
     calendar.month_name[index].lower(): index for index in range(1, 13)
 }
+TABLE_SETTINGS = {
+    "vertical_strategy": "text",
+    "horizontal_strategy": "text",
+    "snap_tolerance": 3,
+    "join_tolerance": 3,
+    "intersection_tolerance": 3,
+    "text_tolerance": 2,
+}
+PRE_REVENUE_ROW_FIELD_MAP = {
+    "available rooms": "available_rooms",
+    "rooms sold": "rooms_sold",
+    "occupancy": "occupancy_pct",
+    "adr": "adr",
+    "revpar": "revpar",
+}
+REVENUE_ROW_FIELD_MAP = {
+    "room revenue": "room_revenue",
+    "food beverage": "fb_revenue",
+    "food and beverage": "fb_revenue",
+    "miscellaneous": "misc_revenue",
+    "total revenue": "total_revenue",
+}
 
 
 def load_prompt() -> str:
@@ -46,6 +73,38 @@ def load_prompt() -> str:
 def canonicalize_text(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", " ", value.lower())
     return re.sub(r"\s+", " ", normalized).strip()
+
+
+def extract_budget_year_from_text(page_text: str, file_name: str) -> int | None:
+    year_candidates = [
+        int(candidate)
+        for candidate in re.findall(r"\b(20\d{2})\b", f"{file_name}\n{page_text}")
+    ]
+
+    if year_candidates:
+        return max(year_candidates)
+
+    return None
+
+
+def extract_hotel_name_from_text(page_text: str) -> str | None:
+    canonical_names = {hotel["canonical_name"] for hotel in load_hotel_registry()}
+    normalized_text = canonicalize_text(page_text)
+    text_tokens = set(normalized_text.split())
+
+    for line in page_text.splitlines():
+        candidate = normalize_hotel_name(line)
+        if candidate in canonical_names:
+            return candidate
+
+    for hotel in load_hotel_registry():
+        if hotel["normalized_name"] in normalized_text:
+            return hotel["canonical_name"]
+
+        if set(hotel["tokens"]).issubset(text_tokens):
+            return hotel["canonical_name"]
+
+    return None
 
 
 @lru_cache(maxsize=1)
@@ -195,6 +254,97 @@ def normalize_budget_row(row: dict, source_hotel_name: str | None, year) -> dict
     return normalized_row
 
 
+def extract_budget_rows_from_pdf_table(pdf_path: Path) -> dict | None:
+    with pdfplumber.open(pdf_path) as pdf:
+        if len(pdf.pages) <= BUDGET_PAGE_NUMBER:
+            return None
+
+        page = pdf.pages[BUDGET_PAGE_NUMBER]
+        page_text = page.extract_text(x_tolerance=2, y_tolerance=2) or ""
+        hotel_name = extract_hotel_name_from_text(page_text)
+        year = extract_budget_year_from_text(page_text, pdf_path.name)
+        table = page.extract_table(table_settings=TABLE_SETTINGS)
+
+    if not hotel_name or year is None or not table:
+        return None
+
+    month_rows: dict[str, list] = {}
+    in_revenue_section = False
+
+    for raw_row in table:
+        if not raw_row or len(raw_row) < 18:
+            continue
+
+        label_parts = [
+            str(cell).replace("\n", "").strip()
+            for cell in raw_row[4:6]
+            if isinstance(cell, str) and cell.strip()
+        ]
+
+        row_label = canonicalize_text("".join(label_parts))
+
+        if row_label == "revenue":
+            in_revenue_section = True
+            continue
+
+        if row_label == "cost of sales" and in_revenue_section:
+            break
+
+        field_name = None
+        if not in_revenue_section:
+            field_name = PRE_REVENUE_ROW_FIELD_MAP.get(row_label)
+        else:
+            field_name = REVENUE_ROW_FIELD_MAP.get(row_label)
+
+        if field_name is None:
+            continue
+
+        month_values = [normalize_number(cell) for cell in raw_row[6:18]]
+        if len(month_values) != 12:
+            continue
+
+        month_rows[field_name] = month_values
+
+    required_fields = set(PRE_REVENUE_ROW_FIELD_MAP.values()) | set(REVENUE_ROW_FIELD_MAP.values())
+    if not required_fields.issubset(month_rows):
+        return None
+
+    raw_result = {
+        "hotel_name": hotel_name,
+        "year": year,
+        "report_type": REPORT_TYPE,
+        "budget_rows": [],
+        "source_file_name": pdf_path.name,
+        "import_time": datetime.now().isoformat(timespec="seconds"),
+    }
+
+    for month_index in range(12):
+        month_number = month_index + 1
+        raw_result["budget_rows"].append(
+            {
+                "month_number": month_number,
+                "month_name": MONTHS_BY_NUMBER[month_number],
+                "available_rooms": month_rows["available_rooms"][month_index],
+                "rooms_sold": month_rows["rooms_sold"][month_index],
+                "occupancy_pct": month_rows["occupancy_pct"][month_index],
+                "adr": month_rows["adr"][month_index],
+                "revpar": month_rows["revpar"][month_index],
+                "room_revenue": month_rows["room_revenue"][month_index],
+                "fb_revenue": month_rows["fb_revenue"][month_index],
+                "misc_revenue": month_rows["misc_revenue"][month_index],
+                "total_revenue": month_rows["total_revenue"][month_index],
+            }
+        )
+
+    raw_result["budget_rows"] = deduplicate_budget_rows(
+        [
+            normalize_budget_row(row, raw_result["hotel_name"], raw_result["year"])
+            for row in raw_result["budget_rows"]
+        ]
+    )
+    return raw_result
+
+
 def deduplicate_budget_rows(rows: list[dict]) -> list[dict]:
     deduplicated_rows = []
     seen_months = set()
@@ -212,6 +362,10 @@ def deduplicate_budget_rows(rows: list[dict]) -> list[dict]:
 
 
 def extract_budget_report(pdf_path: Path) -> dict:
+    parsed_result = extract_budget_rows_from_pdf_table(pdf_path)
+    if parsed_result is not None:
+        return parsed_result
+
     prompt = load_prompt()
     image_path = render_budget_page(pdf_path, page_number=BUDGET_PAGE_NUMBER)
     page_data = extract_json_from_image(image_path, prompt)
@@ -274,6 +428,31 @@ def safe_append_import_log(data: dict, action: str) -> bool:
         return False
 
 
+def clear_budget_monthly_rows() -> bool:
+    try:
+        sheet = get_google_sheet()
+        worksheet = sheet.worksheet("Budget_Monthly")
+        worksheet.batch_clear([SHEET_CLEAR_RANGE])
+        return True
+    except Exception as exc:
+        print(f"Failed to clear Budget_Monthly: {exc}")
+        return False
+
+
+def extract_and_validate_budget_report(pdf_path: Path) -> tuple[dict, list[dict], list[str]]:
+    raw_result = extract_budget_report(pdf_path)
+    budget_rows = prepare_budget_rows(raw_result)
+
+    validation_errors = []
+
+    if len(budget_rows) != 12:
+        validation_errors.append(f"Expected 12 budget months, found {len(budget_rows)}.")
+        return raw_result, budget_rows, validation_errors
+
+    validation_errors = validate_budget_rows(budget_rows)
+    return raw_result, budget_rows, validation_errors
+
+
 def resolve_input_files(argv: list[str]) -> list[Path]:
     if not argv:
         return [PDF_PATH]
@@ -309,9 +488,9 @@ def resolve_input_files(argv: list[str]) -> list[Path]:
     return input_files
 
 
-def process_budget_report(pdf_path: Path):
+def process_budget_report(pdf_path: Path) -> dict[str, int]:
     try:
-        raw_result = extract_budget_report(pdf_path)
+        raw_result, budget_rows, validation_errors = extract_and_validate_budget_report(pdf_path)
     except Exception as exc:
         failure_data = {
             "import_time": datetime.now().isoformat(timespec="seconds"),
@@ -325,7 +504,12 @@ def process_budget_report(pdf_path: Path):
         safe_append_import_log(failure_data, action=ImportStatus.EXTRACTION_FAILED)
         print("Budget extraction failed.")
         print(f"- {exc}")
-        return
+        return {
+            "rows_extracted": 0,
+            "rows_validated": 0,
+            "rows_written": 0,
+            "skipped_rows": 0,
+        }
 
     result_for_output = dict(raw_result)
     result_for_output["status"] = ImportStatus.RAW_EXTRACTED
@@ -339,26 +523,6 @@ def process_budget_report(pdf_path: Path):
         json.dump(result_for_output, file, indent=4)
 
     print(f"\nSaved JSON to: {OUTPUT_JSON_PATH}")
-
-    budget_rows = prepare_budget_rows(raw_result)
-
-    if len(budget_rows) != 12:
-        safe_append_import_log(
-            {
-                "import_time": raw_result.get("import_time"),
-                "hotel_name": raw_result.get("hotel_name"),
-                "report_type": raw_result.get("report_type"),
-                "source_file_name": raw_result.get("source_file_name"),
-                "status": ImportStatus.VALIDATION_FAILED,
-                "notes": f"Expected 12 budget months, found {len(budget_rows)}.",
-            },
-            action=ImportStatus.VALIDATION_FAILED,
-        )
-        print("Budget validation failed.")
-        print(f"- Expected 12 budget months, found {len(budget_rows)}.")
-        return
-
-    validation_errors = validate_budget_rows(budget_rows)
 
     if validation_errors:
         safe_append_import_log(
@@ -377,7 +541,12 @@ def process_budget_report(pdf_path: Path):
         for error in validation_errors[:10]:
             print(f"- {error}")
 
-        return
+        return {
+            "rows_extracted": len(budget_rows),
+            "rows_validated": 0,
+            "rows_written": 0,
+            "skipped_rows": len(budget_rows),
+        }
 
     validated_result = dict(raw_result)
     validated_result["budget_rows"] = budget_rows
@@ -386,7 +555,27 @@ def process_budget_report(pdf_path: Path):
 
     print(json.dumps(validated_result, indent=4))
 
-    result = append_budget_monthly(budget_rows)
+    try:
+        result = append_budget_monthly(budget_rows)
+    except Exception as exc:
+        print(f"Budget Monthly write failed: {exc}")
+        safe_append_import_log(
+            {
+                "import_time": raw_result.get("import_time"),
+                "hotel_name": raw_result.get("hotel_name"),
+                "report_type": raw_result.get("report_type"),
+                "source_file_name": raw_result.get("source_file_name"),
+                "status": ImportStatus.VALIDATED,
+                "notes": f"Budget Monthly write failed: {exc}",
+            },
+            action=ImportStatus.VALIDATED,
+        )
+        return {
+            "rows_extracted": len(budget_rows),
+            "rows_validated": len(budget_rows),
+            "rows_written": 0,
+            "skipped_rows": 0,
+        }
 
     action = ImportStatus.IMPORTED if result["appended"] else ImportStatus.DUPLICATE_SKIPPED
     status = ImportStatus.VALIDATED if result["appended"] else ImportStatus.DUPLICATE_SKIPPED
@@ -405,7 +594,102 @@ def process_budget_report(pdf_path: Path):
     print(f"Budget Monthly appended: {result['appended']}")
     print(f"Budget Monthly skipped: {result['skipped']}")
 
+    return {
+        "rows_extracted": len(budget_rows),
+        "rows_validated": len(budget_rows),
+        "rows_written": result["appended"],
+        "skipped_rows": result["skipped"],
+    }
+
+
+def run_budget_reports(pdf_paths: list[Path], rebuild: bool = False) -> None:
+    if rebuild:
+        preflight_runs = []
+        total_extracted = 0
+        total_validated = 0
+
+        for pdf_path in pdf_paths:
+            try:
+                raw_result, budget_rows, validation_errors = extract_and_validate_budget_report(pdf_path)
+            except Exception as exc:
+                print("Budget extraction failed.")
+                print(f"- {exc}")
+                print(f"rows extracted: {total_extracted}")
+                print(f"rows validated: {total_validated}")
+                print("rows written: 0")
+                print(f"skipped rows: {total_extracted - total_validated}")
+                return
+
+            total_extracted += len(budget_rows)
+
+            if validation_errors:
+                result_for_output = dict(raw_result)
+                result_for_output["status"] = ImportStatus.RAW_EXTRACTED
+                result_for_output["notes"] = "Raw budget extraction only. Validation and import run separately."
+                print(json.dumps(result_for_output, indent=4))
+                OUTPUT_JSON_PATH.parent.mkdir(exist_ok=True)
+                with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as file:
+                    json.dump(result_for_output, file, indent=4)
+                print(f"\nSaved JSON to: {OUTPUT_JSON_PATH}")
+                print("Budget validation failed.")
+                for error in validation_errors[:10]:
+                    print(f"- {error}")
+                print(f"rows extracted: {total_extracted}")
+                print(f"rows validated: {total_validated}")
+                print("rows written: 0")
+                print(f"skipped rows: {total_extracted - total_validated}")
+                return
+
+            total_validated += len(budget_rows)
+            preflight_runs.append(pdf_path)
+
+        if not clear_budget_monthly_rows():
+            print(f"rows extracted: {total_extracted}")
+            print(f"rows validated: {total_validated}")
+            print("rows written: 0")
+            print(f"skipped rows: {total_extracted - total_validated}")
+            return
+
+        total_written = 0
+        total_skipped = 0
+
+        for pdf_path in preflight_runs:
+            result = process_budget_report(pdf_path)
+            total_written += result.get("rows_written", 0)
+            total_skipped += result.get("skipped_rows", 0)
+
+        print(f"rows extracted: {total_extracted}")
+        print(f"rows validated: {total_validated}")
+        print(f"rows written: {total_written}")
+        print(f"skipped rows: {total_skipped}")
+        return
+
+    total_extracted = 0
+    total_validated = 0
+    total_written = 0
+    total_skipped = 0
+
+    for pdf_path in pdf_paths:
+        result = process_budget_report(pdf_path)
+        total_extracted += result.get("rows_extracted", 0)
+        total_validated += result.get("rows_validated", 0)
+        total_written += result.get("rows_written", 0)
+        total_skipped += result.get("skipped_rows", 0)
+
+    print(f"rows extracted: {total_extracted}")
+    print(f"rows validated: {total_validated}")
+    print(f"rows written: {total_written}")
+    print(f"skipped rows: {total_skipped}")
+
+
+def parse_args(argv: list[str]):
+    parser = argparse.ArgumentParser(description="Extract budget PDFs into Budget_Monthly.")
+    parser.add_argument("--rebuild", action="store_true", help="Clear Budget_Monthly before writing.")
+    parser.add_argument("pdf_paths", nargs="*", help="Budget PDF file paths.")
+    return parser.parse_args(argv)
+
 
 if __name__ == "__main__":
-    for file_path in resolve_input_files(sys.argv[1:]):
-        process_budget_report(file_path)
+    arguments = parse_args(sys.argv[1:])
+    file_paths = resolve_input_files(arguments.pdf_paths)
+    run_budget_reports(file_paths, rebuild=arguments.rebuild)

@@ -44,6 +44,7 @@ hotel-data-platform/
 |-- services/
 |   |-- __init__.py
 |   |-- pdf_service.py
+|   |-- hotel_normalization.py
 |   |-- report_detector.py
 |   `-- vision_service.py
 |-- validators/
@@ -96,7 +97,7 @@ Shared mapping and status utilities.
 
 | Module | Responsibility | Status |
 |---|---|---|
-| `booking_mapping.py` | Convert raw booking rows into sheet-ready rows | Active |
+| `booking_mapping.py` | Convert raw booking rows into sheet-ready rows and add `snapshot_date` | Active |
 | `status.py` | Centralized import status strings | Active |
 | `hotel_metrics.py` | Placeholder module | Empty |
 
@@ -122,6 +123,8 @@ Infrastructure helpers shared across extractors and writers.
 | Module | Responsibility | Status |
 |---|---|---|
 | `pdf_service.py` | Render PDF pages to PNG using PyMuPDF | Active |
+| `date_utils.py` | Parse and normalize date-only values | Active |
+| `hotel_normalization.py` | Resolve and normalize hotel names against `config/hotels.json` | Active |
 | `vision_service.py` | Send images to OpenAI Vision and clean JSON responses | Active |
 | `report_detector.py` | Classify report type by file name | Active |
 
@@ -156,6 +159,14 @@ Local Python environment. Use it when running the project locally if it is prese
 
 Converts a PDF page to a PNG image using `fitz` / PyMuPDF. The image is written to `output/pages/`.
 
+### `services/date_utils.py`
+
+Provides shared helpers for parsing date-like values and formatting them as `YYYY-MM-DD`.
+
+### `services/hotel_normalization.py`
+
+Loads the canonical hotel registry from `config/hotels.json`, normalizes source text, and resolves hotel names from report headers with optional fallback candidates.
+
 ### `services/vision_service.py`
 
 Encodes page images as base64, calls the OpenAI Responses API with `gpt-4.1-mini`, and parses the returned text into JSON.
@@ -174,7 +185,7 @@ Processes the first page of the revenue PDF, merges in source metadata, runs rev
 
 ### `extractors/booking_stats.py`
 
-Processes the first 3 pages of the booking PDF, merges page-level raw rows into a single payload, and returns raw extraction data only.
+Processes the first 3 pages of the booking PDF, merges page-level raw rows into a single payload, and returns raw extraction data plus `snapshot_date`.
 
 ### `extractors/booking_header_analyzer.py`
 
@@ -182,7 +193,7 @@ Standalone helper for extracting header metadata from the booking report. It wri
 
 ### `models/booking_mapping.py`
 
-Maps each raw booking row into the schema required by `Booking_Forecast`. It uses the `BOOKING_COLUMNS` order to assign values.
+Maps each raw booking row into the schema required by `Booking_Forecast`. It uses the `BOOKING_COLUMNS` order to assign values and threads through `snapshot_date` for snapshot-based duplicate detection.
 
 ### `models/status.py`
 
@@ -199,6 +210,8 @@ Checks mapped booking rows for presence, duplicate keys, and simple range/negati
 ### `writers/google_sheets.py`
 
 Handles Google OAuth, sheet lookup, row appends, duplicate prevention, and import logging.
+
+For booking rows, `append_booking_forecast_rows()` batch appends rows and deduplicates using `hotel_name + snapshot_date + stay_date`.
 
 ## How `main.py` Orchestrates the Pipeline
 

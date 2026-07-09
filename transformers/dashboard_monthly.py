@@ -399,7 +399,7 @@ def build_dashboard_rows() -> tuple[list[dict[str, Any]], int, int]:
 
 def prepare_target_sheet(worksheet) -> None:
     worksheet.batch_clear([target_clear_range()])
-    worksheet.update("A1", [TARGET_COLUMNS])
+    worksheet.update(range_name="A1", values=[TARGET_COLUMNS])
 
 
 def write_dashboard_rows(rows: list[dict[str, Any]]) -> None:

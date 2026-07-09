@@ -46,7 +46,7 @@ These tabs already exist in the current implementation:
 | Tab | Purpose | Status |
 |---|---|---|
 | `Daily_Hotel_Metrics` | Daily actual revenue facts | Current |
-| `Booking_Forecast` | Booking / OTB snapshot rows | Current |
+| `Booking_Forecast` | Booking / OTB snapshot rows with `snapshot_date` | Current |
 | `Import_Log` | Pipeline audit log | Current |
 
 ## 4. New Required Tabs
@@ -65,7 +65,7 @@ These tabs are required by the finalized dashboard model:
 | Tab | Primary Key | Notes |
 |---|---|---|
 | `Daily_Hotel_Metrics` | `hotel_name + business_date + report_type` | Current implementation key |
-| `Booking_Forecast` | `hotel_name + stay_date + snapshot_date + source_file_name` | Finalized model requires `snapshot_date`; current implementation does not store it yet |
+| `Booking_Forecast` | `hotel_name + snapshot_date + stay_date` | Current implementation stores `snapshot_date` as `YYYY-MM-DD` and preserves all daily snapshots |
 | `Budget_Monthly` | `hotel_name + year + month_number` | Required for monthly budget grain |
 | `Historical_Monthly` | `hotel_name + year + month_number` | Required for monthly historical grain |
 | `Dashboard_Daily_Performance` | `hotel_name + date` | Dashboard-ready daily grain |
@@ -118,7 +118,27 @@ Monthly last-year actuals fact table.
 | `status` | Load status | Required |
 | `notes` | Load notes | Required |
 
-### 6.3 `Dashboard_Daily_Performance`
+### 6.3 `Booking_Forecast`
+
+Daily snapshot table for future stay dates.
+
+| Column | Type / Meaning | Status |
+|---|---|---|
+| `snapshot_date` | Snapshot capture date for the forecast row, stored as `YYYY-MM-DD` | Required |
+| `report_date` | Source report date when available | Required |
+| `hotel_name` | Hotel identifier | Required |
+| `stay_date` | Future stay date | Required |
+| `source_file_name` | Source report filename | Required |
+| `import_time` | Ingestion timestamp | Required |
+| `status` | Load status | Required |
+| `notes` | Load notes | Required |
+
+The current booking payload also includes the mapped numeric columns defined in `models/booking_mapping.py`:
+`gtd`, `non`, `total`, `overs`, `deps`, `guests`, `sold`, `occupancy_pct`, `room_revenue`, `avg_room_revenue`, `group_rooms_not_sold`, `groups_total`, `groups_available`, and `groups_occupancy_pct`.
+
+Legacy `Booking_Forecast` rows that predate `snapshot_date` can still be read by dashboard transforms, which fall back to `import_time` when no snapshot date exists.
+
+### 6.4 `Dashboard_Daily_Performance`
 
 Dashboard-ready daily grain. This is the unified daily view that should choose actuals when available and otherwise use the latest forecast snapshot.
 
@@ -137,9 +157,11 @@ Dashboard-ready daily grain. This is the unified daily view that should choose a
 | `total_revenue` | Daily total revenue | Required for Actual rows; nullable for Forecast rows |
 | `source_file_name` | Source file used | Required |
 | `forecast_snapshot_date` | Forecast snapshot date when `data_type = Forecast` | Required for forecast rows |
+| `date_status` | `Past`, `Today`, or `Future` | Required |
+| `display_data_type` | Dashboard-friendly label such as `Actual`, `Current OTB`, or `Forecast` | Required |
 | `import_time` | Transformation timestamp | Required |
 
-### 6.4 `Dashboard_Monthly_Performance`
+### 6.5 `Dashboard_Monthly_Performance`
 
 Dashboard-ready monthly grain for comparing actual, forecast, budget, and last year.
 
@@ -219,7 +241,7 @@ Dashboard-ready monthly grain for comparing actual, forecast, budget, and last y
 | Area | Current State | Finalized Target |
 |---|---|---|
 | Actuals | Implemented in `Daily_Hotel_Metrics` | Continue as source of truth for actual daily facts |
-| OTB / Forecast | Implemented in `Booking_Forecast` without `snapshot_date` | Add `snapshot_date` and preserve snapshots |
+| OTB / Forecast | Implemented in `Booking_Forecast` with `snapshot_date` | Preserve snapshots and select the latest snapshot downstream |
 | Budget | Not implemented | Add `Budget_Monthly` |
 | Last Year | Not implemented | Add `Historical_Monthly` |
 | Dashboard-ready tables | Not implemented | Add `Dashboard_Daily_Performance` and `Dashboard_Monthly_Performance` |
@@ -229,7 +251,7 @@ Dashboard-ready monthly grain for comparing actual, forecast, budget, and last y
 - Daily last-year comparison requires daily 2025 reports, not only monthly P&L.
 - GOP, EBITDA, payroll, and net income should be Phase 2 after monthly 2026 P&Ls arrive.
 - The exact transformation owner for dashboard-ready tables is still unspecified.
-- The dashboard should confirm whether forecast snapshots are daily, weekly, or ad hoc once `snapshot_date` is added.
+- `Booking_Forecast` now preserves daily snapshots via `snapshot_date`; the dashboard should always select the latest snapshot per hotel and stay date.
 
 ## 12. Hotel Normalization Registry
 
@@ -257,9 +279,11 @@ Example shape:
 
 | Module | Uses `config/hotels.json`? | Notes |
 |---|---|---|
-| `extractors/booking_stats.py` | No | Booking extraction currently returns the hotel name from the source report. |
+| `extractors/revenue_report.py` | Yes | Revenue extraction normalizes the extracted header hotel name and fails closed if unresolved. |
+| `extractors/booking_stats.py` | Yes | Booking extraction normalizes the extracted header hotel name and fails closed if unresolved. |
 | `extractors/budget_report.py` | Yes | Budget extraction normalizes the source hotel name to the canonical registry key. |
 | `extractors/historical_pl.py` | Yes | Historical P&L extraction normalizes the source hotel name to the canonical registry key. |
+| `services/hotel_normalization.py` | Yes | Shared normalization and registry lookup helper. |
 | `validators/` | No | Validators check structure and ranges only. |
 | `writers/` | No | Writers append rows and perform duplicate detection on existing sheet keys. |
 | `main.py` | No | `main.py` orchestrates routing but does not normalize hotel names yet. |

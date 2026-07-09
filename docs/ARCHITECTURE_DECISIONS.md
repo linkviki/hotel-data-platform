@@ -30,7 +30,7 @@ The booking report contains repeated row values that must be preserved exactly a
 
 **Decision**
 
-`extractors/booking_stats.py` returns raw rows and top-level metadata only. Mapping happens later in `models/booking_mapping.py`.
+`extractors/booking_stats.py` returns raw rows and top-level metadata only. Mapping happens later in `models/booking_mapping.py`, where `snapshot_date` is attached for snapshot-preserving writes.
 
 **Consequences**
 
@@ -102,7 +102,7 @@ Booking reports can produce many rows per run, and per-row sheet writes are inef
 
 **Decision**
 
-`writers/google_sheets.py` batches booking inserts with `append_rows()`.
+`writers/google_sheets.py` batches booking inserts with `append_rows()` and deduplicates by `hotel_name + snapshot_date + stay_date`.
 
 **Consequences**
 

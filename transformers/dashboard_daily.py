@@ -8,6 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from services.date_utils import format_date_only
 from writers.google_sheets import get_google_sheet
 
 
@@ -30,6 +31,8 @@ TARGET_COLUMNS = [
     "total_revenue",
     "source_file_name",
     "forecast_snapshot_date",
+    "date_status",
+    "display_data_type",
     "import_time",
 ]
 
@@ -140,41 +143,6 @@ def normalize_percentage(value: Any):
         return round(number, 2)
 
     return number
-
-
-def format_date_value(value: Any) -> str | None:
-    parsed_date = parse_date_value(value)
-    if parsed_date is not None:
-        return parsed_date.isoformat()
-
-    if value is None:
-        return None
-
-    if isinstance(value, str):
-        candidate = value.strip()
-        return candidate or None
-
-    return str(value)
-
-
-def format_timestamp_value(value: Any, fallback: datetime) -> str:
-    if value is None:
-        return fallback.isoformat(timespec="seconds")
-
-    parsed_datetime = parse_datetime_value(value)
-    if parsed_datetime is not None:
-        return parsed_datetime.isoformat(timespec="seconds")
-
-    parsed_date = parse_date_value(value)
-    if parsed_date is not None:
-        return datetime.combine(parsed_date, datetime.min.time()).isoformat(timespec="seconds")
-
-    if isinstance(value, str):
-        candidate = value.strip()
-        if candidate:
-            return candidate
-
-    return fallback.isoformat(timespec="seconds")
 
 
 def compute_revpar(occupancy_pct: Any, adr: Any):
@@ -293,6 +261,8 @@ def build_actual_candidate(record: dict[str, Any], run_timestamp: datetime):
         ),
         "source_file_name": record.get("source_file_name"),
         "forecast_snapshot_date": None,
+        "date_status": compute_date_status(date_value),
+        "display_data_type": "Actual",
         "import_time": run_timestamp.isoformat(timespec="seconds"),
     }
 
@@ -308,11 +278,17 @@ def build_forecast_candidate(record: dict[str, Any], run_timestamp: datetime):
     if not hotel_name or date_value is None:
         return None
 
-    snapshot_source = record.get("snapshot_date")
-    snapshot_marker = parse_datetime_value(snapshot_source)
+    snapshot_source = record.get("snapshot_date") or record.get("report_date") or record.get("import_time")
+    snapshot_marker_date = parse_date_value(snapshot_source) or parse_date_value(record.get("import_time")) or date.min
     import_marker = parse_datetime_value(record.get("import_time")) or datetime.min
-    primary_marker = snapshot_marker or import_marker
-    marker = (primary_marker, import_marker)
+    import_marker_key = (
+        import_marker.toordinal() * 86400
+        + import_marker.hour * 3600
+        + import_marker.minute * 60
+        + import_marker.second
+    )
+    marker = (snapshot_marker_date.toordinal(), import_marker_key)
+    date_status = compute_date_status(date_value)
 
     occupancy_pct = normalize_percentage(record.get("occupancy_pct"))
     adr = parse_number(record.get("avg_room_revenue"))
@@ -330,10 +306,9 @@ def build_forecast_candidate(record: dict[str, Any], run_timestamp: datetime):
         "room_revenue": parse_number(record.get("room_revenue")),
         "total_revenue": None,
         "source_file_name": record.get("source_file_name"),
-        "forecast_snapshot_date": format_timestamp_value(
-            snapshot_source if snapshot_source is not None else record.get("import_time"),
-            fallback=run_timestamp,
-        ),
+        "forecast_snapshot_date": format_date_only(snapshot_source, fallback=record.get("import_time")),
+        "date_status": date_status,
+        "display_data_type": "Current OTB" if date_status == "Today" else "Forecast",
         "import_time": run_timestamp.isoformat(timespec="seconds"),
     }
 
@@ -341,7 +316,7 @@ def build_forecast_candidate(record: dict[str, Any], run_timestamp: datetime):
 
 
 def choose_latest_rows(records: list[dict[str, Any]], builder) -> dict[tuple[str, str], dict[str, Any]]:
-    latest_rows: dict[tuple[str, str], tuple[tuple[datetime, datetime], dict[str, Any]]] = {}
+    latest_rows: dict[tuple[str, str], tuple[tuple[date, datetime], dict[str, Any]]] = {}
 
     for record in records:
         candidate = builder(record)
@@ -356,6 +331,16 @@ def choose_latest_rows(records: list[dict[str, Any]], builder) -> dict[tuple[str
             latest_rows[row_key] = (marker, row)
 
     return {key: value[1] for key, value in latest_rows.items()}
+
+
+def compute_date_status(row_date: date, reference_date: date | None = None) -> str:
+    current_date = reference_date or date.today()
+
+    if row_date < current_date:
+        return "Past"
+    if row_date == current_date:
+        return "Today"
+    return "Future"
 
 
 def load_records(sheet_name: str) -> list[dict[str, Any]]:

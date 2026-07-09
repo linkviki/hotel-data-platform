@@ -37,7 +37,7 @@ Current report coverage:
 | `output/` | Generated artifacts | JSON outputs and rendered PDF page images are written here. |
 | `prompts/` | OpenAI prompt templates | One prompt per extractor. |
 | `samples/` | Local sample inputs | Sample PDFs and sample email text. |
-| `services/` | Reusable infrastructure helpers | PDF rendering, OpenAI Vision calls, and report detection. |
+| `services/` | Reusable infrastructure helpers | PDF rendering, hotel normalization, OpenAI Vision calls, and report detection. |
 | `validators/` | Data quality checks | Revenue validation and mapped booking validation. |
 | `writers/` | Google Sheets write helpers | Sheet append and duplicate detection logic. |
 | `venv/` | Local Python environment | Use this when available for local execution. |
@@ -57,7 +57,7 @@ Current report coverage:
 ## Hotel Normalization Notes
 
 - `config/hotels.json` is the single source of truth for canonical hotel names and their metadata.
-- The current codebase does not yet read this file at runtime; documentation and future implementations should treat it as the contract for normalization work.
+- The current codebase reads this file through the shared hotel-normalization service.
 - Canonical names are the top-level JSON keys, for example `Residence Inn Laval` and `Holiday Inn Express Halifax`.
 - Standardization means converting aliases or report variations to the exact canonical key before any grouping, duplicate detection, dashboard transform, or warehouse-style output.
 - Unknown hotels should remain usable as raw source values, but they should not be silently re-labeled or merged into a different hotel.
@@ -70,18 +70,20 @@ Current report coverage:
 
 1. `main.py` detects the report type from the file name.
 2. `extractors/revenue_report.py` renders page 1 to PNG and sends the image plus prompt to OpenAI Vision.
-3. `validators/revenue_validator.py` checks required fields and basic arithmetic consistency.
-4. `writers/google_sheets.py` appends to `Daily_Hotel_Metrics` unless the row is already present.
-5. `writers/google_sheets.py` appends an `Import_Log` entry for success, duplicate skip, or validation failure.
+3. `extractors/revenue_report.py` normalizes the report-header hotel name against `config/hotels.json`.
+4. `validators/revenue_validator.py` checks required fields and basic arithmetic consistency.
+5. `writers/google_sheets.py` appends to `Daily_Hotel_Metrics` unless the row is already present.
+6. `writers/google_sheets.py` appends an `Import_Log` entry for success, duplicate skip, or validation failure.
 
 ### Booking Stats Report
 
 1. `main.py` detects the report type from the file name.
 2. `extractors/booking_stats.py` renders the first 3 pages and extracts raw rows only.
-3. `models/booking_mapping.py` maps raw row values into sheet-ready fields.
-4. `validators/booking_validator.py` validates the mapped rows.
-5. `writers/google_sheets.py` batch appends to `Booking_Forecast`.
-6. `writers/google_sheets.py` appends an `Import_Log` entry.
+3. `extractors/booking_stats.py` normalizes the report-header hotel name and records `snapshot_date`.
+4. `models/booking_mapping.py` maps raw row values into sheet-ready fields.
+5. `validators/booking_validator.py` validates the mapped rows.
+6. `writers/google_sheets.py` batch appends to `Booking_Forecast`.
+7. `writers/google_sheets.py` appends an `Import_Log` entry.
 
 ### Budget Report
 

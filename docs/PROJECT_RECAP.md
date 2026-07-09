@@ -17,7 +17,7 @@ The repository uses a simple layered pipeline:
 
 | Layer | Responsibility |
 |---|---|
-| `services/` | PDF rendering, OpenAI Vision, and report type detection |
+| `services/` | PDF rendering, OpenAI Vision, hotel normalization, and report type detection |
 | `extractors/` | Report-specific extraction entry points |
 | `models/` | Row mapping and shared status constants |
 | `validators/` | Data quality rules |
@@ -27,9 +27,10 @@ The repository uses a simple layered pipeline:
 ## Completed Features
 
 - Revenue Report extraction from a PDF page image.
+- Shared hotel-name normalization from `config/hotels.json`.
 - Revenue validation before append.
 - Booking Stats raw extraction from the first 3 pages.
-- Booking row mapping into the `Booking_Forecast` schema.
+- Booking row mapping into the `Booking_Forecast` schema, including `snapshot_date`.
 - Booking validation after mapping.
 - Google Sheets appends for `Daily_Hotel_Metrics`, `Booking_Forecast`, and `Import_Log`.
 - Duplicate prevention for revenue and booking sheet writes.
@@ -52,6 +53,7 @@ sample PDF
 
 - The first page is the only page processed.
 - `extractors/revenue_report.py` adds source metadata and validation status.
+- `extractors/revenue_report.py` normalizes the extracted hotel name and fails closed when it cannot be resolved.
 - `main.py` prints the resulting JSON and then writes to Google Sheets when validation passes.
 - Duplicate detection happens in `writers/google_sheets.py` before append.
 
@@ -71,7 +73,7 @@ sample PDF
 
 ### Current behavior
 
-- `extractors/booking_stats.py` returns raw extracted data only.
+- `extractors/booking_stats.py` returns raw extracted data plus `snapshot_date`, and normalizes the hotel name from the report header.
 - `main.py` performs mapping and validation.
 - `writers/google_sheets.py` batch appends booking rows using `append_rows`.
 - Booking success prints appended/skipped counts.
@@ -99,7 +101,7 @@ sample PDF
 | Function | Target Tab | Current Behavior |
 |---|---|---|
 | `append_daily_hotel_metrics()` | `Daily_Hotel_Metrics` | Appends one row unless an existing record matches the duplicate key. |
-| `append_booking_forecast_rows()` | `Booking_Forecast` | Batch appends non-duplicate rows. |
+| `append_booking_forecast_rows()` | `Booking_Forecast` | Batch appends non-duplicate rows using `hotel_name + snapshot_date + stay_date`. |
 | `append_import_log()` | `Import_Log` | Always appends a new log row. |
 
 ## Import_Log Flow
@@ -122,7 +124,7 @@ Typical log data includes:
 | Target | Duplicate Key | Notes |
 |---|---|---|
 | `Daily_Hotel_Metrics` | `business_date + hotel_name + report_type` | Checked against existing sheet records before append. |
-| `Booking_Forecast` | `hotel_name + stay_date + source_file_name` | Checked against existing records and rows queued in the same batch. |
+| `Booking_Forecast` | `hotel_name + snapshot_date + stay_date` | Checked against existing records and rows queued in the same batch. |
 
 ## Known Limitations
 
@@ -144,6 +146,13 @@ Typical log data includes:
 - Several placeholder files exist but do not yet carry implementation:
   - `config/settings.py`
   - `models/hotel_metrics.py`
+
+## Validated July MVP State
+
+- Booking snapshots are append-only in `Booking_Forecast` with duplicate key `hotel_name + snapshot_date + stay_date`.
+- Revenue actuals override forecast rows in `Dashboard_Daily_Performance` when an actual exists for the same hotel and date.
+- July 5, July 6, and July 7 revenue validation passed for Residence Inn Laval.
+- `python -m transformers.dashboard_monthly --start-month 2026-07` writes July, August, and September.
 
 ## Next Roadmap
 

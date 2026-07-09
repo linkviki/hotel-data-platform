@@ -9,10 +9,10 @@ def validate_mapped_booking_rows(rows: list[dict]) -> list[str]:
 
     for index, row in enumerate(rows, start=1):
         hotel_name = row.get("hotel_name")
+        snapshot_date = row.get("snapshot_date")
         stay_date = row.get("stay_date")
-        source_file_name = row.get("source_file_name")
 
-        key = (hotel_name, stay_date, source_file_name)
+        key = (hotel_name, snapshot_date, stay_date)
 
         if key in seen_keys:
             errors.append(f"Row {index}: duplicate row for {key}")
@@ -21,6 +21,9 @@ def validate_mapped_booking_rows(rows: list[dict]) -> list[str]:
 
         if not hotel_name:
             errors.append(f"Row {index}: missing hotel_name")
+
+        if not snapshot_date:
+            errors.append(f"Row {index}: missing snapshot_date")
 
         if not stay_date:
             errors.append(f"Row {index}: missing stay_date")

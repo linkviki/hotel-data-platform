@@ -1,9 +1,12 @@
 import os
 from dotenv import load_dotenv
 import gspread
+from gspread import Cell
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+
+from services.date_utils import format_date_only
 
 load_dotenv()
 
@@ -86,32 +89,83 @@ def append_import_log(data: dict, action: str):
     worksheet.append_row(row, value_input_option="USER_ENTERED")
     return True
 
+
+def _ensure_booking_forecast_columns(worksheet):
+    columns = worksheet.row_values(1)
+
+    if "snapshot_date" not in columns:
+        next_column_index = len(columns) + 1
+        worksheet.update_cell(1, next_column_index, "snapshot_date")
+        columns.append("snapshot_date")
+
+    return columns
+
+
+def _normalize_booking_snapshot_date(record: dict) -> str:
+    return format_date_only(
+        record.get("snapshot_date")
+        or record.get("report_date")
+        or record.get("import_time"),
+        fallback=record.get("import_time"),
+    )
+
+
+def _booking_forecast_key(record: dict) -> tuple[str, str, str]:
+    return (
+        str(record.get("hotel_name", "")).strip(),
+        _normalize_booking_snapshot_date(record),
+        str(record.get("stay_date", "")).strip(),
+    )
+
+
+def _normalize_existing_booking_forecast_snapshot_dates(worksheet, columns: list[str]) -> int:
+    if "snapshot_date" not in columns:
+        return 0
+
+    snapshot_column_index = columns.index("snapshot_date") + 1
+    records = worksheet.get_all_records()
+    cells_to_update = []
+
+    for row_number, record in enumerate(records, start=2):
+        normalized_snapshot_date = _normalize_booking_snapshot_date(record)
+        current_snapshot_date = format_date_only(record.get("snapshot_date"))
+
+        if current_snapshot_date != normalized_snapshot_date:
+            cells_to_update.append(
+                Cell(row_number, snapshot_column_index, normalized_snapshot_date)
+            )
+
+    if cells_to_update:
+        worksheet.update_cells(cells_to_update, value_input_option="USER_ENTERED")
+
+    return len(cells_to_update)
+
+
 def append_booking_forecast_rows(rows: list[dict]):
     sheet = get_google_sheet()
     worksheet = sheet.worksheet("Booking_Forecast")
 
-    columns = worksheet.row_values(1)
+    columns = _ensure_booking_forecast_columns(worksheet)
+    normalized_existing_count = _normalize_existing_booking_forecast_snapshot_dates(worksheet, columns)
     records = worksheet.get_all_records()
 
-    existing_keys = {
-        (
-            str(record.get("hotel_name", "")).strip(),
-            str(record.get("stay_date", "")).strip(),
-            str(record.get("source_file_name", "")).strip(),
-        )
-        for record in records
-    }
+    existing_keys = {_booking_forecast_key(record) for record in records}
+    print(f"Booking_Forecast existing duplicate-key count loaded: {len(existing_keys)}")
+    print(f"Booking_Forecast existing rows normalized: {normalized_existing_count}")
 
     appended_count = 0
     skipped_count = 0
     rows_to_append = []
 
     for data in rows:
+        snapshot_date = _normalize_booking_snapshot_date(data)
         key = (
             str(data.get("hotel_name", "")).strip(),
+            snapshot_date,
             str(data.get("stay_date", "")).strip(),
-            str(data.get("source_file_name", "")).strip(),
         )
+
+        data["snapshot_date"] = snapshot_date
 
         if key in existing_keys:
             skipped_count += 1
@@ -124,6 +178,9 @@ def append_booking_forecast_rows(rows: list[dict]):
 
     if rows_to_append:
         worksheet.append_rows(rows_to_append, value_input_option="USER_ENTERED")
+
+    print(f"Booking_Forecast rows appended: {appended_count}")
+    print(f"Booking_Forecast rows skipped: {skipped_count}")
 
     return {
         "appended": appended_count,
